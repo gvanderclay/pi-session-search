@@ -14,6 +14,7 @@ import { FtsSessionIndex } from "./fts-index";
 import type { ParsedSession } from "./parser";
 import { SessionIndex, stripHeavyFields } from "./session-index";
 import type { ListFilters, SearchResult } from "./session-index";
+import { acquireSyncLock } from "./sync-lock";
 
 /** Structured-clonable index settings (crosses the worker boundary). */
 export interface IndexOptions {
@@ -31,7 +32,11 @@ export interface SyncResult {
   updated: number;
   removed: number;
   moved: number;
+  skipped?: true;
+  holderPid?: number;
 }
+
+export type RebuildResult = { skipped: true; holderPid: number } | undefined;
 
 export interface IndexEntry {
   session: ParsedSession;
@@ -47,7 +52,7 @@ export interface IndexService {
   /** Open the index and load persisted state. Resolves to the session count. */
   load(): Promise<number>;
   sync(callbacks?: SyncCallbacks): Promise<SyncResult>;
-  rebuild(callbacks?: SyncCallbacks): Promise<void>;
+  rebuild(callbacks?: SyncCallbacks): Promise<RebuildResult>;
   search(query: string, limit: number, project?: string): Promise<SearchResult[]>;
   list(filters?: ListFilters): Promise<ParsedSession[]>;
   get(fileOrId: string): Promise<IndexEntry | undefined>;
@@ -111,15 +116,34 @@ export function createIndexService(options: IndexOptions): IndexService {
     },
     sync(callbacks) {
       // Concurrent callers (initial sync, periodic timer, /session-sync) share one run.
-      inflightSync ??= exclusive(() =>
-        open().sync(callbacks?.onProgress, callbacks?.onError),
-      ).finally(() => {
+      inflightSync ??= exclusive(async () => {
+        const index = open();
+        const lock = acquireSyncLock(options.indexDir);
+        if (!lock.held) {
+          return { added: 0, updated: 0, removed: 0, moved: 0, skipped: true as const, holderPid: lock.holderPid };
+        }
+        try {
+          return await index.sync(callbacks?.onProgress, callbacks?.onError);
+        } finally {
+          lock.release();
+        }
+      }).finally(() => {
         inflightSync = null;
       });
       return inflightSync;
     },
     rebuild(callbacks) {
-      return exclusive(() => open().rebuild(callbacks?.onProgress, callbacks?.onError));
+      return exclusive(async () => {
+        const index = open();
+        const lock = acquireSyncLock(options.indexDir);
+        if (!lock.held) return { skipped: true, holderPid: lock.holderPid };
+        try {
+          await index.rebuild(callbacks?.onProgress, callbacks?.onError);
+          return undefined;
+        } finally {
+          lock.release();
+        }
+      });
     },
     // Results drop the raw message text: the tools never show it, and it is
     // the bulk of what would otherwise be cloned across the thread boundary.
@@ -211,7 +235,7 @@ export function spawnIndexWorker(
   return {
     load: () => call("load"),
     sync: (callbacks) => call("sync", [], callbacks),
-    rebuild: (callbacks) => call("rebuild", [], callbacks),
+    rebuild: (callbacks) => call<RebuildResult>("rebuild", [], callbacks),
     search: (query, limit, project) => call("search", [query, limit, project]),
     list: (filters) => call("list", [filters]),
     get: (fileOrId) => call("get", [fileOrId]),

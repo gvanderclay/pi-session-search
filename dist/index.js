@@ -1341,6 +1341,75 @@ ${truncatedAssistant}`);
   return parts.join("\n\n").slice(0, 16e3);
 }
 
+// src/sync-lock.ts
+import { closeSync as closeSync2, openSync as openSync2, readFileSync as readFileSync4, unlinkSync, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join5 } from "node:path";
+var SYNC_TIMEOUT_MS = 6e5;
+function readOwner(path) {
+  let raw;
+  try {
+    raw = readFileSync4(path, "utf8");
+  } catch (err) {
+    if (err.code === "ENOENT") return void 0;
+    throw err;
+  }
+  try {
+    const owner = JSON.parse(raw);
+    if (Number.isInteger(owner?.pid) && owner.pid > 0 && Number.isFinite(owner.startedAt) && owner.startedAt >= 0) {
+      return owner;
+    }
+  } catch {
+  }
+  return void 0;
+}
+function isStale(owner) {
+  if (Date.now() - owner.startedAt > SYNC_TIMEOUT_MS) return true;
+  try {
+    process.kill(owner.pid, 0);
+  } catch (err) {
+    return err.code === "ESRCH";
+  }
+  return false;
+}
+function acquireSyncLock(indexDir) {
+  const path = join5(indexDir, "sync.lock");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let fd;
+    try {
+      fd = openSync2(path, "wx");
+    } catch (err) {
+      if (err.code !== "EEXIST") throw err;
+      const owner = readOwner(path);
+      if (attempt === 1 || owner && !isStale(owner)) {
+        return { held: false, holderPid: owner?.pid ?? 0 };
+      }
+      try {
+        unlinkSync(path);
+      } catch (err2) {
+        if (err2.code !== "ENOENT") throw err2;
+      }
+      continue;
+    }
+    try {
+      writeFileSync3(fd, JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
+    } finally {
+      closeSync2(fd);
+    }
+    return {
+      held: true,
+      release() {
+        if (readOwner(path)?.pid !== process.pid) return;
+        try {
+          unlinkSync(path);
+        } catch (err) {
+          if (err.code !== "ENOENT") throw err;
+        }
+      }
+    };
+  }
+  throw new Error("unreachable sync lock state");
+}
+
 // src/index-service.ts
 function createIndexService(options) {
   let index = null;
@@ -1377,15 +1446,34 @@ function createIndexService(options) {
       return index.size();
     },
     sync(callbacks) {
-      inflightSync ??= exclusive(
-        () => open().sync(callbacks?.onProgress, callbacks?.onError)
-      ).finally(() => {
+      inflightSync ??= exclusive(async () => {
+        const index2 = open();
+        const lock = acquireSyncLock(options.indexDir);
+        if (!lock.held) {
+          return { added: 0, updated: 0, removed: 0, moved: 0, skipped: true, holderPid: lock.holderPid };
+        }
+        try {
+          return await index2.sync(callbacks?.onProgress, callbacks?.onError);
+        } finally {
+          lock.release();
+        }
+      }).finally(() => {
         inflightSync = null;
       });
       return inflightSync;
     },
     rebuild(callbacks) {
-      return exclusive(() => open().rebuild(callbacks?.onProgress, callbacks?.onError));
+      return exclusive(async () => {
+        const index2 = open();
+        const lock = acquireSyncLock(options.indexDir);
+        if (!lock.held) return { skipped: true, holderPid: lock.holderPid };
+        try {
+          await index2.rebuild(callbacks?.onProgress, callbacks?.onError);
+          return void 0;
+        } finally {
+          lock.release();
+        }
+      });
     },
     // Results drop the raw message text: the tools never show it, and it is
     // the bulk of what would otherwise be cloned across the thread boundary.
@@ -1465,14 +1553,14 @@ function spawnIndexWorker(workerFile, options, onCrash) {
 }
 
 // src/reader.ts
-import { readFileSync as readFileSync4 } from "node:fs";
+import { readFileSync as readFileSync5 } from "node:fs";
 function readSessionConversation(file, options) {
   const offset = options?.offset ?? 0;
   const limit = options?.limit ?? 50;
   const includeTools = options?.includeTools ?? false;
   let raw;
   try {
-    raw = readFileSync4(file, "utf8");
+    raw = readFileSync5(file, "utf8");
   } catch (err) {
     return `Error reading session: ${err.message}`;
   }
@@ -1820,7 +1908,7 @@ ${lines.join("\n")}
       );
     }
     if (!initAction.skip) {
-      const SYNC_TIMEOUT_MS = 6e5;
+      const SYNC_TIMEOUT_MS2 = 6e5;
       const delayMs = initAction.delayMs ?? DEFAULT_INITIAL_DELAY_MS;
       const runSync = () => Promise.race([
         index.sync({
@@ -1828,7 +1916,7 @@ ${lines.join("\n")}
           onError: notifySyncError(ctx)
         }),
         new Promise(
-          (resolve2) => scheduleTimer(() => resolve2(null), SYNC_TIMEOUT_MS)
+          (resolve2) => scheduleTimer(() => resolve2(null), SYNC_TIMEOUT_MS2)
         )
       ]);
       const initialSync = async () => {
