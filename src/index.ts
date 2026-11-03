@@ -105,11 +105,13 @@ export function resolveInitialSyncAction(rawDelay?: number): {
  *
  * Signals checked (any one triggers):
  * - `PI_SUBAGENT_DEPTH > 0` — official pi-subagents child marker
+ * - `PI_UNATTENDED === "1"` — unattended session, including tmux delegates
  * - `!process.stdin.isTTY` — non-interactive terminal (CI/CD, pipes, SDK embedders)
  */
 export function isChildProcess(): boolean {
   const depth = Number(process.env.PI_SUBAGENT_DEPTH);
   if (depth > 0) return true;
+  if (process.env.PI_UNATTENDED === "1") return true;
   if (!process.stdin.isTTY) return true;
   return false;
 }

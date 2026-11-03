@@ -6,7 +6,7 @@
  * setInterval isn't scheduled when intervalMs === -1 without needing
  * a full pi runtime mock.
  */
-import { describe, it, afterEach } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { resolveSyncAction, resolveInitialSyncAction, isChildProcess } from "../index";
 
@@ -86,9 +86,16 @@ describe("resolveInitialSyncAction", () => {
 
 describe("isChildProcess", () => {
   const origDepth = process.env.PI_SUBAGENT_DEPTH;
+  const origUnattended = process.env.PI_UNATTENDED;
   const origStdinIsTty = process.stdin.isTTY;
 
+  beforeEach(() => {
+    delete process.env.PI_UNATTENDED;
+  });
+
   afterEach(() => {
+    if (origUnattended === undefined) delete process.env.PI_UNATTENDED;
+    else process.env.PI_UNATTENDED = origUnattended;
     // Restore environment.
     if (origDepth === undefined) {
       delete process.env.PI_SUBAGENT_DEPTH;
@@ -136,7 +143,31 @@ describe("isChildProcess", () => {
     assert.equal(isChildProcess(), true);
   });
 
-  it("returns false when both signals are absent (normal interactive session)", () => {
+  it("returns true for an unattended TTY session without a subagent depth", () => {
+    delete process.env.PI_SUBAGENT_DEPTH;
+    process.env.PI_UNATTENDED = "1";
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: true,
+      writable: false,
+      enumerable: true,
+      configurable: true,
+    });
+    assert.equal(isChildProcess(), true);
+  });
+
+  it("does not treat PI_UNATTENDED=0 as an unattended session", () => {
+    delete process.env.PI_SUBAGENT_DEPTH;
+    process.env.PI_UNATTENDED = "0";
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: true,
+      writable: false,
+      enumerable: true,
+      configurable: true,
+    });
+    assert.equal(isChildProcess(), false);
+  });
+
+  it("returns false when all signals are absent (normal interactive session)", () => {
     delete process.env.PI_SUBAGENT_DEPTH;
     Object.defineProperty(process.stdin, "isTTY", {
       value: true,

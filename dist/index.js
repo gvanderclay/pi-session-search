@@ -1763,6 +1763,7 @@ function resolveInitialSyncAction(rawDelay) {
 function isChildProcess() {
   const depth = Number(process.env.PI_SUBAGENT_DEPTH);
   if (depth > 0) return true;
+  if (process.env.PI_UNATTENDED === "1") return true;
   if (!process.stdin.isTTY) return true;
   return false;
 }
