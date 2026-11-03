@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- `PI_SESSION_SEARCH=off` turns the extension off on a machine without
+  changing the shared Pi settings.
+
 ### Fixed
 
 - Sync and rebuild share a cross-process lock in each index directory. Other

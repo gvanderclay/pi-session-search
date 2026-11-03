@@ -118,6 +118,7 @@ export function isChildProcess(): boolean {
 }
 
 export default function (pi: ExtensionAPI) {
+  if (process.env.PI_SESSION_SEARCH === "off") return;
   let sessionIndex: IndexService | null = null;
   let indexState: IndexState = "off";
   let indexError = "";

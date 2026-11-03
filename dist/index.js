@@ -1771,6 +1771,7 @@ function isChildProcess() {
   return false;
 }
 function index_default(pi) {
+  if (process.env.PI_SESSION_SEARCH === "off") return;
   let sessionIndex = null;
   let indexState = "off";
   let indexError = "";

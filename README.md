@@ -189,6 +189,7 @@ Tested against a 2,159-session corpus: hybrid surfaces **75% more relevant docum
 |----------|-------------|
 | `OPENAI_API_KEY` | Required for OpenAI embedder |
 | `MISTRAL_API_KEY` | Required for Mistral embedder |
+| `PI_SESSION_SEARCH` | `off` turns the extension off: no tools, commands, index or sync. Set it in a machine's shell profile to disable session search there while sharing one Pi configuration. The bundled `session-history` skill still loads. |
 
 ## Project-local storage
 
