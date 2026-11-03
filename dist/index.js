@@ -1929,7 +1929,6 @@ ${lines.join("\n")}
       );
     }
     if (!initAction.skip) {
-      const SYNC_TIMEOUT_MS2 = 6e5;
       const delayMs = initAction.delayMs ?? DEFAULT_INITIAL_DELAY_MS;
       const runSync = () => Promise.race([
         index.sync({
@@ -1937,7 +1936,7 @@ ${lines.join("\n")}
           onError: notifySyncError(ctx)
         }),
         new Promise(
-          (resolve2) => scheduleTimer(() => resolve2(null), SYNC_TIMEOUT_MS2)
+          (resolve2) => scheduleTimer(() => resolve2(null), SYNC_TIMEOUT_MS)
         )
       ]);
       const initialSync = async () => {
@@ -1947,7 +1946,7 @@ ${lines.join("\n")}
           if (syncResult === null) {
             ctx.ui.notify("session-search: sync timed out (index may be stale)", "warning");
             ctx.ui.setStatus("session-search", "");
-          } else {
+          } else if (!syncResult.skipped) {
             const changes = formatChanges(syncResult);
             if (changes) {
               ctx.ui.setStatus(
@@ -1985,7 +1984,7 @@ ${lines.join("\n")}
         if (shuttingDown || indexState === "failed") return;
         try {
           const result = await index.sync();
-          if (shuttingDown) return;
+          if (shuttingDown || result.skipped) return;
           const changes = formatChanges(result);
           if (changes) {
             ctx.ui.setStatus(
@@ -2153,10 +2152,14 @@ ${lines.join("\n")}
           onProgress: (msg) => ctx.ui.setStatus("session-search", msg),
           onError: notifySyncError(ctx)
         });
-        ctx.ui.notify(
-          `Synced: ${formatChanges(r, "") || "no changes"} (${await index.size()} total)`,
-          "info"
-        );
+        if (r.skipped) {
+          ctx.ui.notify(`session-search: another session (pid ${r.holderPid}) is syncing`, "info");
+        } else {
+          ctx.ui.notify(
+            `Synced: ${formatChanges(r, "") || "no changes"} (${await index.size()} total)`,
+            "info"
+          );
+        }
         ctx.ui.setStatus("session-search", "");
       } catch (err) {
         ctx.ui.notify(`Sync failed: ${err.message}`, "error");
@@ -2173,14 +2176,18 @@ ${lines.join("\n")}
       }
       ctx.ui.notify("Re-indexing sessions...", "info");
       try {
-        await index.rebuild({
+        const result = await index.rebuild({
           onProgress: (msg) => ctx.ui.setStatus("session-search", msg),
           onError: notifySyncError(ctx)
         });
-        ctx.ui.notify(
-          `Re-indexed: ${await index.size()} sessions`,
-          "info"
-        );
+        if (result?.skipped) {
+          ctx.ui.notify(`session-search: another session (pid ${result.holderPid}) is syncing`, "info");
+        } else {
+          ctx.ui.notify(
+            `Re-indexed: ${await index.size()} sessions`,
+            "info"
+          );
+        }
         ctx.ui.setStatus("session-search", "");
       } catch (err) {
         ctx.ui.notify(`Re-index failed: ${err.message}`, "error");

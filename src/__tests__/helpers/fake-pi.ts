@@ -15,6 +15,7 @@ export interface FakeHost {
   start(): Promise<void>;
   shutdown(): Promise<void>;
   tool(name: string, params: Record<string, unknown>): Promise<string>;
+  command(name: string, args?: string): Promise<void>;
   cleanup(): void;
 }
 
@@ -61,12 +62,13 @@ export function createFakeHost(
 
   const handlers = new Map<string, (event: any, ctx: any) => Promise<void> | void>();
   const tools = new Map<string, any>();
+  const commands = new Map<string, any>();
   const sent: { message: any; options: any }[] = [];
   const notes: string[] = [];
   extension({
     on: (event: string, fn: any) => handlers.set(event, fn),
     registerTool: (t: any) => tools.set(t.name, t),
-    registerCommand: () => {},
+    registerCommand: (name: string, command: any) => commands.set(name, command),
     sendMessage: (message: any, options: any) => sent.push({ message, options }),
   });
   const ctx = {
@@ -85,6 +87,7 @@ export function createFakeHost(
     start: async () => handlers.get("session_start")!({ type: "session_start", reason: "startup" }, ctx),
     shutdown: async () => handlers.get("session_shutdown")!({ type: "session_shutdown" }, ctx),
     tool: async (name, params) => (await tools.get(name).execute("call", params)).content[0].text,
+    command: async (name, args = "") => commands.get(name).handler(args, ctx),
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
