@@ -123,6 +123,7 @@ export function createIndexService(options: IndexOptions): IndexService {
           return { added: 0, updated: 0, removed: 0, moved: 0, skipped: true as const, holderPid: lock.holderPid };
         }
         try {
+          if (index instanceof SessionIndex) index.reloadIfChanged();
           return await index.sync(callbacks?.onProgress, callbacks?.onError);
         } finally {
           lock.release();

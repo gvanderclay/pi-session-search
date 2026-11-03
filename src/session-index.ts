@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { ParsedSession } from "./parser";
@@ -119,6 +119,7 @@ export function stripHeavyFields(session: ParsedSession): ParsedSession {
 export class SessionIndex {
   private data: IndexData = { version: INDEX_VERSION, sessions: {} };
   private indexPath: string;
+  private indexMtimeMs: number | undefined;
   private fts: FtsSide;
 
   constructor(
@@ -137,7 +138,25 @@ export class SessionIndex {
 
   /** Load existing index from disk. */
   async load(): Promise<void> {
-    if (!existsSync(this.indexPath)) return;
+    this.loadData(this.diskMtime());
+  }
+
+  reloadIfChanged(): void {
+    const mtimeMs = this.diskMtime();
+    if (mtimeMs !== this.indexMtimeMs) this.loadData(mtimeMs);
+  }
+
+  private diskMtime(): number | undefined {
+    return statSync(this.indexPath, { throwIfNoEntry: false })?.mtimeMs;
+  }
+
+  private loadData(mtimeMs: number | undefined): void {
+    // Remember the pre-read mtime so a concurrent rename triggers the next reload.
+    this.indexMtimeMs = mtimeMs;
+    if (mtimeMs === undefined) {
+      this.data = { version: INDEX_VERSION, sessions: {} };
+      return;
+    }
     try {
       const raw = readFileSync(this.indexPath, "utf8");
       const parsed = JSON.parse(raw) as IndexData;
@@ -194,6 +213,7 @@ export class SessionIndex {
     const tmp = `${this.indexPath}.${process.pid}.tmp`;
     writeFileSync(tmp, JSON.stringify(this.data), "utf8");
     renameSync(tmp, this.indexPath);
+    this.indexMtimeMs = this.diskMtime();
   }
 
   /** Number of indexed sessions. */
@@ -422,6 +442,7 @@ export class SessionIndex {
     signal?: AbortSignal,
     project?: string
   ): Promise<SearchResult[]> {
+    this.reloadIfChanged();
     let entries = Object.values(this.data.sessions);
     if (entries.length === 0) return [];
 
@@ -496,6 +517,7 @@ export class SessionIndex {
    * List sessions with optional filters.
    */
   list(filters?: ListFilters): ParsedSession[] {
+    this.reloadIfChanged();
     let sessions = Object.values(this.data.sessions).map((e) => e.session);
 
     if (filters?.project) {
@@ -533,6 +555,7 @@ export class SessionIndex {
    * Get a specific session by file path or session ID.
    */
   get(fileOrId: string): IndexedSession | undefined {
+    this.reloadIfChanged();
     // Try direct session ID lookup
     if (this.data.sessions[fileOrId]) {
       return this.data.sessions[fileOrId];

@@ -792,7 +792,7 @@ function toFtsQuery(q) {
 }
 
 // src/session-index.ts
-import { readFileSync as readFileSync2, writeFileSync, existsSync as existsSync2, mkdirSync as mkdirSync2, renameSync, statSync as statSync3 } from "node:fs";
+import { readFileSync as readFileSync2, writeFileSync, mkdirSync as mkdirSync2, renameSync, statSync as statSync3 } from "node:fs";
 import { join as join3 } from "node:path";
 import { DatabaseSync as DatabaseSync3 } from "node:sqlite";
 var FtsSide = class {
@@ -888,10 +888,25 @@ var SessionIndex = class {
   fusion;
   data = { version: INDEX_VERSION, sessions: {} };
   indexPath;
+  indexMtimeMs;
   fts;
   /** Load existing index from disk. */
   async load() {
-    if (!existsSync2(this.indexPath)) return;
+    this.loadData(this.diskMtime());
+  }
+  reloadIfChanged() {
+    const mtimeMs = this.diskMtime();
+    if (mtimeMs !== this.indexMtimeMs) this.loadData(mtimeMs);
+  }
+  diskMtime() {
+    return statSync3(this.indexPath, { throwIfNoEntry: false })?.mtimeMs;
+  }
+  loadData(mtimeMs) {
+    this.indexMtimeMs = mtimeMs;
+    if (mtimeMs === void 0) {
+      this.data = { version: INDEX_VERSION, sessions: {} };
+      return;
+    }
     try {
       const raw = readFileSync2(this.indexPath, "utf8");
       const parsed = JSON.parse(raw);
@@ -939,6 +954,7 @@ var SessionIndex = class {
     const tmp = `${this.indexPath}.${process.pid}.tmp`;
     writeFileSync(tmp, JSON.stringify(this.data), "utf8");
     renameSync(tmp, this.indexPath);
+    this.indexMtimeMs = this.diskMtime();
   }
   /** Number of indexed sessions. */
   size() {
@@ -1093,6 +1109,7 @@ var SessionIndex = class {
    * substring match against projectSlug or cwd.
    */
   async search(query, limit = 10, signal, project) {
+    this.reloadIfChanged();
     let entries = Object.values(this.data.sessions);
     if (entries.length === 0) return [];
     let allowedIds;
@@ -1146,6 +1163,7 @@ var SessionIndex = class {
    * List sessions with optional filters.
    */
   list(filters) {
+    this.reloadIfChanged();
     let sessions = Object.values(this.data.sessions).map((e) => e.session);
     if (filters?.project) {
       const slug = filters.project.toLowerCase();
@@ -1172,6 +1190,7 @@ var SessionIndex = class {
    * Get a specific session by file path or session ID.
    */
   get(fileOrId) {
+    this.reloadIfChanged();
     if (this.data.sessions[fileOrId]) {
       return this.data.sessions[fileOrId];
     }
@@ -1335,6 +1354,7 @@ function createIndexService(options) {
           return { added: 0, updated: 0, removed: 0, moved: 0, skipped: true, holderPid: lock.holderPid };
         }
         try {
+          if (index2 instanceof SessionIndex) index2.reloadIfChanged();
           return await index2.sync(callbacks?.onProgress, callbacks?.onError);
         } finally {
           lock.release();
