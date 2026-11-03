@@ -1361,7 +1361,7 @@ ${truncatedAssistant}`);
 }
 
 // src/sync-lock.ts
-import { closeSync as closeSync2, openSync as openSync2, readFileSync as readFileSync4, unlinkSync, writeFileSync as writeFileSync3 } from "node:fs";
+import { linkSync, readFileSync as readFileSync4, unlinkSync, writeFileSync as writeFileSync3 } from "node:fs";
 import { join as join5 } from "node:path";
 var SYNC_TIMEOUT_MS = 6e5;
 function readOwner(path) {
@@ -1390,12 +1390,20 @@ function isStale(owner) {
   }
   return false;
 }
+function publish(path) {
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync3(tmp, JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
+  try {
+    linkSync(tmp, path);
+  } finally {
+    unlinkSync(tmp);
+  }
+}
 function acquireSyncLock(indexDir) {
   const path = join5(indexDir, "sync.lock");
   for (let attempt = 0; attempt < 2; attempt++) {
-    let fd;
     try {
-      fd = openSync2(path, "wx");
+      publish(path);
     } catch (err) {
       if (err.code !== "EEXIST") throw err;
       const owner = readOwner(path);
@@ -1408,11 +1416,6 @@ function acquireSyncLock(indexDir) {
         if (err2.code !== "ENOENT") throw err2;
       }
       continue;
-    }
-    try {
-      writeFileSync3(fd, JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
-    } finally {
-      closeSync2(fd);
     }
     return {
       held: true,

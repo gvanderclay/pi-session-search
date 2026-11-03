@@ -1,4 +1,4 @@
-import { closeSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { linkSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const SYNC_TIMEOUT_MS = 600_000;
@@ -40,12 +40,23 @@ function isStale(owner: LockOwner): boolean {
   return false;
 }
 
+// Link a fully written temp file into place so no reader ever sees a
+// half-written lock and mistakes it for a stale one.
+function publish(path: string): void {
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
+  try {
+    linkSync(tmp, path);
+  } finally {
+    unlinkSync(tmp);
+  }
+}
+
 export function acquireSyncLock(indexDir: string): SyncLock {
   const path = join(indexDir, "sync.lock");
   for (let attempt = 0; attempt < 2; attempt++) {
-    let fd: number;
     try {
-      fd = openSync(path, "wx");
+      publish(path);
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
       const owner = readOwner(path);
@@ -58,11 +69,6 @@ export function acquireSyncLock(indexDir: string): SyncLock {
         if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
       }
       continue;
-    }
-    try {
-      writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
-    } finally {
-      closeSync(fd);
     }
     return {
       held: true,
