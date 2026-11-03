@@ -55,6 +55,17 @@ Config is stored at `~/.pi/session-search/config.json`. The `embedder` field is 
 ### Sync configuration
 
 By default, the session index re-syncs automatically every 5 minutes after startup.
+Only one process syncs or rebuilds a given index directory at a time.
+Other sessions skip the work and read the saved result. In hybrid mode, search,
+list, and get reload the JSON index when its modification time changes.
+The `sync.lock` file lives in the index directory, including when you use
+`localPath`. A dead process, an invalid lock file, or a lock older than
+10 minutes allows the next sync to take over.
+
+If another session holds the lock, `/session-sync` and `/session-reindex`
+report its process ID instead of claiming success. Initial and periodic syncs
+skip silently.
+
 Fine-tune or disable this behaviour via the `sync` field:
 
 ```json
@@ -71,7 +82,7 @@ Fine-tune or disable this behaviour via the `sync` field:
 |-------|------|---------|-------------|
 | `interval` | number | `300000` (5 min) | Milliseconds between periodic re-syncs. Set to `-1` to disable periodic sync entirely (initial startup sync still runs). Any other non-positive value falls back to 5 min with a warning. |
 | `initialDelay` | number | `0` (immediate) | Milliseconds to wait before the first startup sync. Set to `-1` to skip the initial sync entirely. Set to a positive value to defer startup sync (e.g., `2000` to let pi finish booting first). |
-| `disableForChild` | boolean | `false` | When `true`, automatically disables both initial and periodic sync if the pi process is detected as a subagent child (`PI_SUBAGENT_DEPTH > 0`) or running non-interactively (`!process.stdin.isTTY`). Useful for CI/CD pipelines and nested agent workflows. |
+| `disableForChild` | boolean | `false` | When `true`, automatically disables both initial and periodic sync if the pi process is detected as a subagent child (`PI_SUBAGENT_DEPTH > 0`), unattended (`PI_UNATTENDED=1`, including tmux delegates), or running non-interactively (`!process.stdin.isTTY`). Useful for CI/CD pipelines and nested agent workflows. |
 
 **Common configurations:**
 

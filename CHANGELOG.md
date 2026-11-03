@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Sync and rebuild share a cross-process lock in each index directory. Other
+  sessions skip duplicate work instead of repeating embedding requests. Dead,
+  invalid, or expired locks allow a later sync to take over.
+- Hybrid indexes reload another session's saved changes before sync, search,
+  list, and get. Sessions see new results without restarting and avoid
+  overwriting a newer index with stale in-memory data.
+- Manual sync and reindex commands report the lock holder's process ID when
+  another session is syncing.
+- `sync.disableForChild` also recognizes `PI_UNATTENDED=1`, so unattended
+  tmux delegates skip initial and periodic sync.
+
 ## 1.6.1
 
 ### Fixed
