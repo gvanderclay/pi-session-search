@@ -399,14 +399,16 @@ export default function (pi: ExtensionAPI) {
           if (syncResult === null) {
             ctx.ui.notify("session-search: sync timed out (index may be stale)", "warning");
             ctx.ui.setStatus("session-search", "");
-          } else if (!syncResult.skipped) {
-            const changes = formatChanges(syncResult);
+          } else {
+            const changes = syncResult.skipped ? "" : formatChanges(syncResult);
             if (changes) {
               ctx.ui.setStatus(
                 "session-search",
                 `Sessions: ${changes} (${await index.size()} total)`,
               );
               scheduleTimer(() => ctx.ui.setStatus("session-search", ""), 5000);
+            } else {
+              ctx.ui.setStatus("session-search", "");
             }
           }
         } catch (err: any) {

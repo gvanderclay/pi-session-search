@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import extension from "../index";
 import { acquireSyncLock } from "../sync-lock";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { createFakeHost, untilWarm, writeSession } from "./helpers/fake-pi";
 
 describe("sync command lock notices", () => {
@@ -38,6 +39,26 @@ describe("sync command lock notices", () => {
       }
     });
   }
+
+  it("clears the progress status when the initial sync indexes nothing", async () => {
+    const host = createFakeHost(join(import.meta.dirname, "__tmp_initial_status__"), extension, {
+      sync: { interval: -1, initialDelay: 0 },
+    });
+    try {
+      mkdirSync(host.sessionsDir, { recursive: true });
+      writeFileSync(
+        join(host.sessionsDir, "empty.jsonl"),
+        JSON.stringify({ type: "session", version: 1, id: "empty", timestamp: "2026-01-15T10:00:00Z", cwd: "/tmp/proj" }),
+      );
+      await host.start();
+      assert.equal(await untilWarm(host, 5000), "Session index is empty.");
+      assert.ok(host.statuses.some(s => /^Indexing 1 sessions/.test(s)), "progress was shown");
+      assert.equal(host.statuses.at(-1), "");
+    } finally {
+      await host.shutdown();
+      host.cleanup();
+    }
+  });
 
   it("silently skips the initial sync and finishes warming when another session holds the lock", async () => {
     const host = createFakeHost(join(import.meta.dirname, "__tmp_initial_lock__"), extension, {

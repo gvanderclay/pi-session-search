@@ -14,6 +14,8 @@
   another session is syncing.
 - `sync.disableForChild` also recognizes `PI_UNATTENDED=1`, so unattended
   tmux delegates skip initial and periodic sync.
+- The startup sync clears its progress status when it indexes nothing, so a
+  run whose embeddings all failed no longer leaves "Indexed N/N..." behind.
 
 ## 1.6.1
 
