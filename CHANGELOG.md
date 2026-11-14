@@ -9,6 +9,16 @@
 - The OpenAI and Mistral embedders use the key Pi stores for the `openai` or
   `mistral` provider when neither the config nor the environment has one.
 
+### Changed
+
+- `session_list` is registered with `exposure: "deferred"`, so pi no longer
+  declares it in every request (about 300 tokens per request). It stays
+  callable from codemode scripts and is found with `searchTools`;
+  `session_search` and `session_read` stay declared to the model.
+- The `@earendil-works/pi-coding-agent` dev dependency is `^1.5.2` (was
+  `^0.87.1`), whose `ToolDefinition` has `exposure`. The runtime peer range
+  stays `*`.
+
 ### Fixed
 
 - Sync and rebuild share a cross-process lock in each index directory. Other

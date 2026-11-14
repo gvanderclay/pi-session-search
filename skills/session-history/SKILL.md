@@ -23,6 +23,8 @@ session_search(query="setting up CI pipeline for myapp")
 ### session_list
 Browse sessions with filters. Good for time-based queries or project-specific browsing.
 
+This tool is deferred: pi does not declare it to the model. Find it with `searchTools("session list")` and call it from a codemode script as `tools.session_list({...})`.
+
 ```
 session_list(project="myapp")                    # Sessions in the myapp project
 session_list(after="2026-03-01", limit=10)       # Recent sessions
@@ -42,7 +44,7 @@ session_read(session="...", include_tools=true)             # Include tool call 
 
 ## Workflow
 
-1. **Find sessions**: Use `session_search` for semantic queries or `session_list` for browsing
+1. **Find sessions**: Use `session_search` for semantic queries or `session_list` for browsing (via codemode)
 2. **Read details**: Use `session_read` with the file path from results to see the full conversation
 3. **Extract context**: Use information from past sessions to inform current work
 
