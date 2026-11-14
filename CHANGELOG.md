@@ -6,6 +6,8 @@
 
 - `PI_SESSION_SEARCH=off` turns the extension off on a machine without
   changing the shared Pi settings.
+- The OpenAI and Mistral embedders use the key Pi stores for the `openai` or
+  `mistral` provider when neither the config nor the environment has one.
 
 ### Fixed
 

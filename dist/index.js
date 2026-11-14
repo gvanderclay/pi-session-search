@@ -1742,6 +1742,17 @@ var WARMING_NOTE = "Note: session index warming (initial sync still running), so
 function withReloadHint(cause) {
   return `${cause.replace(/\.$/, "")}. Run /reload to restart indexing.`;
 }
+var PI_KEY_PROVIDERS = {
+  mistral: { provider: "mistral", env: "MISTRAL_API_KEY" },
+  openai: { provider: "openai", env: "OPENAI_API_KEY" }
+};
+async function withPiApiKey(embedder, modelRegistry) {
+  if (!embedder || embedder.apiKey) return embedder;
+  const source = PI_KEY_PROVIDERS[embedder.type];
+  if (!source || process.env[source.env]) return embedder;
+  const apiKey = await modelRegistry?.getApiKeyForProvider?.(source.provider).catch(() => void 0);
+  return apiKey ? { ...embedder, apiKey } : embedder;
+}
 function textResult(text, details = {}) {
   return { content: [{ type: "text", text }], details };
 }
@@ -1891,7 +1902,7 @@ ${lines.join("\n")}
           extraArchiveDirs: config?.extraArchiveDirs ?? [],
           sessionDir: config?.sessionDir,
           archiveDir: config?.archiveDir,
-          embedder: config?.embedder,
+          embedder: await withPiApiKey(config?.embedder, ctx.modelRegistry),
           fusion: config?.fusion
         },
         ctx
@@ -2419,6 +2430,7 @@ export {
   resolveSyncAction,
   slugToProject,
   toFtsQuery,
-  truncate2 as truncate
+  truncate2 as truncate,
+  withPiApiKey
 };
 //# sourceMappingURL=index.js.map

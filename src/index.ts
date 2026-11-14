@@ -9,6 +9,7 @@ import {
   DEFAULT_INITIAL_DELAY_MS,
 } from "./config";
 import type { Config } from "./config";
+import type { EmbedderConfig } from "./embedder";
 import { createIndexService, spawnIndexWorker } from "./index-service";
 import type { IndexOptions, IndexService, SyncResult } from "./index-service";
 import { readSessionConversation } from "./reader";
@@ -49,6 +50,31 @@ const WARMING_NOTE =
 /** "<cause>. Run /reload to restart indexing." without doubling a trailing period. */
 function withReloadHint(cause: string): string {
   return `${cause.replace(/\.$/, "")}. Run /reload to restart indexing.`;
+}
+
+/**
+ * Pi providers whose stored API key an embedder can use, with the environment
+ * variable that already takes precedence over it.
+ */
+const PI_KEY_PROVIDERS: Partial<Record<EmbedderConfig["type"], { provider: string; env: string }>> = {
+  mistral: { provider: "mistral", env: "MISTRAL_API_KEY" },
+  openai: { provider: "openai", env: "OPENAI_API_KEY" },
+};
+
+/**
+ * The embedder config with Pi's stored key for its provider filled in, when
+ * neither the config nor the environment gives one. Order: config apiKey,
+ * environment variable, then the key Pi resolves (auth.json or models.json).
+ */
+export async function withPiApiKey(
+  embedder: EmbedderConfig | undefined,
+  modelRegistry: { getApiKeyForProvider?(provider: string): Promise<string | undefined> } | undefined,
+): Promise<EmbedderConfig | undefined> {
+  if (!embedder || embedder.apiKey) return embedder;
+  const source = PI_KEY_PROVIDERS[embedder.type];
+  if (!source || process.env[source.env]) return embedder;
+  const apiKey = await modelRegistry?.getApiKeyForProvider?.(source.provider).catch(() => undefined);
+  return apiKey ? { ...embedder, apiKey } : embedder;
 }
 
 /** Build a text tool result; one details type keeps every return path assignable. */
@@ -314,7 +340,7 @@ export default function (pi: ExtensionAPI) {
           extraArchiveDirs: config?.extraArchiveDirs ?? [],
           sessionDir: config?.sessionDir,
           archiveDir: config?.archiveDir,
-          embedder: config?.embedder,
+          embedder: await withPiApiKey(config?.embedder, ctx.modelRegistry),
           fusion: config?.fusion,
         },
         ctx,

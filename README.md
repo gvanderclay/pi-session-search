@@ -44,13 +44,15 @@ Requires **Node 22.19+** (pi's own floor). The index uses `node:sqlite` with FTS
 
 To enable hybrid search (keyword + semantic), run `/session-embeddings-setup` in pi to configure an embedding provider:
 
-- **OpenAI** — Uses `text-embedding-3-small` (needs `OPENAI_API_KEY`)
-- **Mistral** — Uses `mistral-embed` (needs `MISTRAL_API_KEY`)
+- **OpenAI** — Uses `text-embedding-3-small` (needs an OpenAI key)
+- **Mistral** — Uses `mistral-embed` by default; set `model` to `codestral-embed` (with `dimensions: 1536`) for code-heavy sessions (needs a Mistral key)
 - **Bedrock** — Uses Titan Embeddings v2 (needs AWS credentials)
 - **Ollama** — Uses `nomic-embed-text` (needs local Ollama running)
 - **OpenAI-compatible** — Any provider with a `/v1/embeddings` endpoint (Together, Fireworks, vLLM, LiteLLM, etc.)
 
 Config is stored at `~/.pi/session-search/config.json`. The `embedder` field is optional — omit it for FTS5-only mode.
+
+The OpenAI and Mistral embedders take their key from `apiKey` in the config, else `OPENAI_API_KEY` or `MISTRAL_API_KEY`, else the key Pi stores for its `openai` or `mistral` provider (from `pi auth login` or `models.json`), so a key Pi already has needs no copy.
 
 ### Sync configuration
 
@@ -187,8 +189,8 @@ Tested against a 2,159-session corpus: hybrid surfaces **75% more relevant docum
 
 | Variable | Description |
 |----------|-------------|
-| `OPENAI_API_KEY` | Required for OpenAI embedder |
-| `MISTRAL_API_KEY` | Required for Mistral embedder |
+| `OPENAI_API_KEY` | Key for the OpenAI embedder |
+| `MISTRAL_API_KEY` | Key for the Mistral embedder |
 | `PI_SESSION_SEARCH` | `off` turns the extension off: no tools, commands, index or sync. Set it in a machine's shell profile to disable session search there while sharing one Pi configuration. The bundled `session-history` skill still loads. |
 
 ## Project-local storage

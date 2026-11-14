@@ -40,6 +40,7 @@ export function createFakeHost(
   root: string,
   extension: (pi: any) => void,
   config: Record<string, unknown> = {},
+  ctxExtras: Record<string, unknown> = {},
 ): FakeHost {
   rmSync(root, { recursive: true, force: true });
   const base = join(root, "base");
@@ -78,6 +79,7 @@ export function createFakeHost(
     hasUI: true,
     ui: { notify: (m: string) => notes.push(m), setStatus: (_key: string, text: string) => statuses.push(text) },
     sessionManager: { getEntries: () => [] },
+    ...ctxExtras,
   };
 
   return {
