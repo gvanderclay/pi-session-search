@@ -8,6 +8,9 @@
   changing the shared Pi settings.
 - The OpenAI and Mistral embedders use the key Pi stores for the `openai` or
   `mistral` provider when neither the config nor the environment has one.
+- An embedder's `piProvider` names the Pi provider whose stored key it uses
+  when the config has no `apiKey`, so `openai-compatible` embedders such as
+  OpenCode Go need no key in `config.json`.
 
 ### Changed
 

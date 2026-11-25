@@ -44,6 +44,13 @@ describe("withPiApiKey", () => {
     assert.deepEqual(pi.asked, []);
   });
 
+  it("fills a key from the Pi provider the config names, for any embedder type", async () => {
+    const pi = registry({ "opencode-go": "go-key" });
+    const config = { type: "openai-compatible" as const, baseUrl: "http://x.test", piProvider: "opencode-go" };
+    assert.equal((await withPiApiKey(config, pi))?.apiKey, "go-key");
+    assert.deepEqual(pi.asked, ["opencode-go"]);
+  });
+
   it("leaves embedders without a Pi provider, and failed lookups, unchanged", async () => {
     delete process.env.MISTRAL_API_KEY;
     const config = { type: "openai-compatible" as const, baseUrl: "http://x.test" };

@@ -52,7 +52,19 @@ To enable hybrid search (keyword + semantic), run `/session-embeddings-setup` in
 
 Config is stored at `~/.pi/session-search/config.json`. The `embedder` field is optional — omit it for FTS5-only mode.
 
-The OpenAI and Mistral embedders take their key from `apiKey` in the config, else `OPENAI_API_KEY` or `MISTRAL_API_KEY`, else the key Pi stores for its `openai` or `mistral` provider (from `pi auth login` or `models.json`), so a key Pi already has needs no copy.
+The OpenAI and Mistral embedders take their key from `apiKey` in the config, else `OPENAI_API_KEY` or `MISTRAL_API_KEY`, else the key Pi stores for its `openai` or `mistral` provider (from `pi auth login` or `models.json`), so a key Pi already has needs no copy. Any embedder can name the Pi provider whose key to use instead with `piProvider`, so a config without `apiKey` can be committed:
+
+```json
+{
+  "embedder": {
+    "type": "openai-compatible",
+    "baseUrl": "https://opencode.ai/inference/go/openai",
+    "piProvider": "opencode-go",
+    "model": "qwen3-embedding-8b",
+    "dimensions": 4096
+  }
+}
+```
 
 ### Sync configuration
 

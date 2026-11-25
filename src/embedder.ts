@@ -15,6 +15,8 @@ export interface EmbedderConfig {
   type: "openai" | "bedrock" | "ollama" | "mistral" | "openai-compatible";
   // OpenAI / Mistral / OpenAI-compatible
   apiKey?: string;
+  /** Pi provider whose stored key to use when `apiKey` is unset, e.g. "opencode-go". */
+  piProvider?: string;
   model?: string;
   baseUrl?: string;
   /**

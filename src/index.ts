@@ -64,7 +64,8 @@ const PI_KEY_PROVIDERS: Partial<Record<EmbedderConfig["type"], { provider: strin
 /**
  * The embedder config with Pi's stored key for its provider filled in, when
  * neither the config nor the environment gives one. Order: config apiKey,
- * environment variable, then the key Pi resolves (auth.json or models.json).
+ * environment variable, then the key Pi resolves (auth.json or models.json)
+ * for the config's `piProvider`, else for the embedder type's own provider.
  */
 export async function withPiApiKey(
   embedder: EmbedderConfig | undefined,
@@ -72,8 +73,9 @@ export async function withPiApiKey(
 ): Promise<EmbedderConfig | undefined> {
   if (!embedder || embedder.apiKey) return embedder;
   const source = PI_KEY_PROVIDERS[embedder.type];
-  if (!source || process.env[source.env]) return embedder;
-  const apiKey = await modelRegistry?.getApiKeyForProvider?.(source.provider).catch(() => undefined);
+  const provider = embedder.piProvider ?? source?.provider;
+  if (!provider || (source && process.env[source.env])) return embedder;
+  const apiKey = await modelRegistry?.getApiKeyForProvider?.(provider).catch(() => undefined);
   return apiKey ? { ...embedder, apiKey } : embedder;
 }
 

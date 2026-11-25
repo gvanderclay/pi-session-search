@@ -1749,8 +1749,9 @@ var PI_KEY_PROVIDERS = {
 async function withPiApiKey(embedder, modelRegistry) {
   if (!embedder || embedder.apiKey) return embedder;
   const source = PI_KEY_PROVIDERS[embedder.type];
-  if (!source || process.env[source.env]) return embedder;
-  const apiKey = await modelRegistry?.getApiKeyForProvider?.(source.provider).catch(() => void 0);
+  const provider = embedder.piProvider ?? source?.provider;
+  if (!provider || source && process.env[source.env]) return embedder;
+  const apiKey = await modelRegistry?.getApiKeyForProvider?.(provider).catch(() => void 0);
   return apiKey ? { ...embedder, apiKey } : embedder;
 }
 function textResult(text, details = {}) {
