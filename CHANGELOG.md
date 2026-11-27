@@ -21,8 +21,10 @@
 - `session_read` is deferred where reaching it keeps the prompt cache: with
   active `codemode`, or with `tool_search` on a model Pi adds tools to in
   place (about 600 characters per request). Elsewhere it stays declared, and
-  switching to a model that resends its tools declares it. The
-  `tool-exposure` test that pinned `session_read` as declared now pins this.
+  switching to a model that resends its tools declares it. `session_list`
+  follows the same rule, so a session with neither codemode nor
+  `tool_search` can reach it again. The `tool-exposure` tests that pinned
+  `session_read` as declared now pin this.
 - The `@earendil-works/pi-coding-agent` dev dependency is `^1.5.2` (was
   `^0.87.1`), whose `ToolDefinition` has `exposure`. The runtime peer range
   stays `*`.

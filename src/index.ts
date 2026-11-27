@@ -23,9 +23,9 @@ import { declareUnlessReachable } from "./deferred";
 /**
  * Tools left out of every request where a codemode script or tool_search
  * reaches them without costing the prompt cache; declared otherwise.
- * session_search's guideline names session_read.
+ * session_search's guideline names both.
  */
-const DEFERRED_TOOLS = ["session_read"];
+const DEFERRED_TOOLS = ["session_list", "session_read"];
 
 /**
  * Bundled worker entry. Resolves the same from src/index.ts (pi-total-recall
@@ -743,7 +743,7 @@ export default function (pi: ExtensionAPI) {
     promptGuidelines: [
       "Use session_search to find past coding sessions relevant to the current task (e.g. 'when did we refactor the auth module', 'previous work on Lambda timeouts').",
       "Pass the optional `project` parameter to limit search to a single project — use a substring of the project path or slug (e.g. 'pi-session-search').",
-      "Browse with session_list (searchTools in codemode); use session_read to dive into a specific session.",
+      "Browse by date/project with session_list; use session_read to dive into a specific session.",
     ],
     parameters: Type.Object({
       query: Type.String({ description: "Natural language search query" }),
@@ -823,8 +823,7 @@ export default function (pi: ExtensionAPI) {
     label: "Session List",
     description:
       "List past pi sessions with optional filters by project, date range, or archive status. Returns session metadata and summaries.",
-    // Deferred: callable from codemode scripts and found with searchTools, but
-    // not declared to the model, so its schema costs no tokens per request.
+    // Deferred where codemode or a cache-keeping tool_search reaches it; see DEFERRED_TOOLS.
     exposure: "deferred",
     promptSnippet:
       "List/filter past pi sessions by project, date, or archive status.",
@@ -945,7 +944,7 @@ export default function (pi: ExtensionAPI) {
         } else {
           const note = indexState === "warming" ? `\n\n${WARMING_NOTE}` : "";
           return textResult(
-            `Session not found: "${params.session}". Use session_search, or session_list from a codemode script, to find the session file path.${note}`,
+            `Session not found: "${params.session}". Use session_search or session_list to find the session file path.${note}`,
           );
         }
       }

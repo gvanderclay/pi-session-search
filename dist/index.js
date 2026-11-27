@@ -1759,7 +1759,7 @@ function declareUnlessReachable(pi, names, model) {
 }
 
 // src/index.ts
-var DEFERRED_TOOLS = ["session_read"];
+var DEFERRED_TOOLS = ["session_list", "session_read"];
 var INDEX_WORKER_FILE = fileURLToPath(new URL("../dist/index-worker.js", import.meta.url));
 var PRIMER_WAIT_MS = 1e3;
 var useIndexWorker = true;
@@ -2252,7 +2252,7 @@ ${lines.join("\n")}
     promptGuidelines: [
       "Use session_search to find past coding sessions relevant to the current task (e.g. 'when did we refactor the auth module', 'previous work on Lambda timeouts').",
       "Pass the optional `project` parameter to limit search to a single project \u2014 use a substring of the project path or slug (e.g. 'pi-session-search').",
-      "Browse with session_list (searchTools in codemode); use session_read to dive into a specific session."
+      "Browse by date/project with session_list; use session_read to dive into a specific session."
     ],
     parameters: Type.Object({
       query: Type.String({ description: "Natural language search query" }),
@@ -2318,8 +2318,7 @@ ${lines.join("\n")}
     name: "session_list",
     label: "Session List",
     description: "List past pi sessions with optional filters by project, date range, or archive status. Returns session metadata and summaries.",
-    // Deferred: callable from codemode scripts and found with searchTools, but
-    // not declared to the model, so its schema costs no tokens per request.
+    // Deferred where codemode or a cache-keeping tool_search reaches it; see DEFERRED_TOOLS.
     exposure: "deferred",
     promptSnippet: "List/filter past pi sessions by project, date, or archive status.",
     parameters: Type.Object({
@@ -2424,7 +2423,7 @@ ${lines.join("\n")}
 
 ${WARMING_NOTE}` : "";
           return textResult(
-            `Session not found: "${params.session}". Use session_search, or session_list from a codemode script, to find the session file path.${note}`
+            `Session not found: "${params.session}". Use session_search or session_list to find the session file path.${note}`
           );
         }
       }

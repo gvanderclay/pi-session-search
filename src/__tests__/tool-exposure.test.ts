@@ -57,7 +57,7 @@ describe("tool exposure", () => {
     }
   });
 
-  it("leaves session_read undeclared where codemode or a cache-keeping tool_search reaches it", () => {
+  it("leaves session_list and session_read undeclared where codemode or a cache-keeping tool_search reaches it", () => {
     for (const [builtins, model] of [
       [["codemode"], resends],
       [["tool_search"], inPlace],
@@ -68,13 +68,14 @@ describe("tool exposure", () => {
     }
   });
 
-  it("declares session_read where nothing else reaches it without losing the cache, and never withdraws it", () => {
+  it("declares session_list and session_read where nothing else reaches them without losing the cache, and never withdraws them", () => {
+    const all = ["session_list", "session_read", "session_search"];
     for (const builtins of [[], ["tool_search"]]) {
       const h = host(builtins);
       h.selectModel(resends);
-      assert.deepEqual(h.declared(), ["session_read", "session_search"], builtins.join());
+      assert.deepEqual(h.declared(), all, builtins.join());
       h.selectModel(inPlace);
-      assert.deepEqual(h.declared(), ["session_read", "session_search"], builtins.join());
+      assert.deepEqual(h.declared(), all, builtins.join());
     }
   });
 });
