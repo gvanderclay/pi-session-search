@@ -71,6 +71,9 @@ export function createFakeHost(
   extension({
     on: (event: string, fn: any) => handlers.set(event, fn),
     registerTool: (t: any) => tools.set(t.name, t),
+    getAllTools: () => [...tools.keys()].map((name) => ({ name })),
+    getActiveTools: () => [],
+    setActiveTools: () => {},
     registerCommand: (name: string, command: any) => commands.set(name, command),
     sendMessage: (message: any, options: any) => sent.push({ message, options }),
   });

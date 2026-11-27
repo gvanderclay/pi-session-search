@@ -1730,6 +1730,36 @@ function summarizeArgs(args) {
 import { existsSync as existsSync3 } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+// src/deferred.ts
+function addsToolsInPlace(model) {
+  const compat = model?.compat;
+  const has = (flag) => typeof compat === "object" && compat !== null && Reflect.get(compat, flag) === true;
+  if (!model || !has("supportsMidConvoSystemMessages")) return false;
+  switch (model.api) {
+    case "anthropic-messages":
+      return has("supportsMidConvoToolChanges");
+    case "openai-completions":
+      return has("supportsMidConvoToolAdditions");
+    case "openai-responses":
+    case "openai-codex-responses":
+    case "azure-openai-responses":
+      return has("supportsAdditionalTools") || has("supportsToolSearch");
+    default:
+      return false;
+  }
+}
+function declareUnlessReachable(pi, names, model) {
+  const registered = new Set(pi.getAllTools().map((tool) => tool.name));
+  const active = new Set(pi.getActiveTools());
+  const reach = (name) => registered.has(name) && active.has(name);
+  if (reach("codemode") || reach("tool_search") && addsToolsInPlace(model)) return;
+  const declare = names.filter((name) => registered.has(name) && !active.has(name));
+  if (declare.length > 0) pi.setActiveTools([...active, ...declare]);
+}
+
+// src/index.ts
+var DEFERRED_TOOLS = ["session_read"];
 var INDEX_WORKER_FILE = fileURLToPath(new URL("../dist/index-worker.js", import.meta.url));
 var PRIMER_WAIT_MS = 1e3;
 var useIndexWorker = true;
@@ -1850,7 +1880,9 @@ ${lines.join("\n")}
     } catch {
     }
   }
+  pi.on("model_select", (event) => declareUnlessReachable(pi, DEFERRED_TOOLS, event.model));
   pi.on("session_start", async (_event, ctx) => {
+    declareUnlessReachable(pi, DEFERRED_TOOLS, ctx.model);
     sessionCwd = ctx.cwd;
     try {
       currentConfig = loadConfig(sessionCwd);
@@ -2355,6 +2387,8 @@ ${lines.join("\n")}
   pi.registerTool({
     name: "session_read",
     label: "Session Read",
+    // Deferred where codemode or a cache-keeping tool_search reaches it; see DEFERRED_TOOLS.
+    exposure: "deferred",
     description: "Read the full conversation from a past pi session. Provide the session file path or session ID. Supports pagination for large sessions.",
     promptSnippet: "Read the full conversation from a specific past pi session by file path or ID.",
     parameters: Type.Object({

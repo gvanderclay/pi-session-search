@@ -146,7 +146,7 @@ session_search(query="CI pipeline configuration", limit=5)
 ```
 
 ### Browse sessions
-`session_list` is deferred: it stays callable from codemode scripts (find it with `searchTools`) but pi does not declare it in the model's tool list, so it costs no context per request.
+`session_list` is deferred: it stays callable from codemode scripts (find it with `searchTools`) but pi does not declare it in the model's tool list, so it costs no context per request. `session_read` is deferred the same way where `codemode` is active, or `tool_search` is active on a model pi adds tools to in place; elsewhere it is declared.
 
 ```
 session_list(project="myapp", after="2026-03-01")

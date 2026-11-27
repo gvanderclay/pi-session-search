@@ -18,6 +18,14 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { truncate, pathToSlug, formatRelativeDate } from "./utils";
+import { declareUnlessReachable } from "./deferred";
+
+/**
+ * Tools left out of every request where a codemode script or tool_search
+ * reaches them without costing the prompt cache; declared otherwise.
+ * session_search's guideline names session_read.
+ */
+const DEFERRED_TOOLS = ["session_read"];
 
 /**
  * Bundled worker entry. Resolves the same from src/index.ts (pi-total-recall
@@ -263,7 +271,9 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  pi.on("model_select", (event) => declareUnlessReachable(pi, DEFERRED_TOOLS, event.model));
   pi.on("session_start", async (_event, ctx) => {
+    declareUnlessReachable(pi, DEFERRED_TOOLS, ctx.model);
     sessionCwd = ctx.cwd;
     try {
       currentConfig = loadConfig(sessionCwd);
@@ -895,6 +905,8 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "session_read",
     label: "Session Read",
+    // Deferred where codemode or a cache-keeping tool_search reaches it; see DEFERRED_TOOLS.
+    exposure: "deferred",
     description:
       "Read the full conversation from a past pi session. Provide the session file path or session ID. Supports pagination for large sessions.",
     promptSnippet:
